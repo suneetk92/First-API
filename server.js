@@ -15,7 +15,7 @@ var User        = require('./app/models/user');
 var mongoDB     = require('mongodb');
 var ObjectId    = mongoDB.ObjectID;
 var jwt         = require('jsonwebtoken');
-var supersecret = 'mynameissuneet';
+var superSecret = 'mynameissuneet';
 
 // *****************
 // APP CONFIGURATION
@@ -52,7 +52,7 @@ app.get('/', function(req, res) {
 var apiRouter = express.Router();
 
 // Route for authenticating users
-apiRouter.post('/authenticate', sunction(req, res) {
+apiRouter.post('/authenticate', function(req, res) {
 	// Find the user
 	// Select the name username and password explicitly
 	User.findOne({ username: req.body.username })
@@ -97,7 +97,34 @@ apiRouter.post('/authenticate', sunction(req, res) {
 apiRouter.use(function(req, res, next) {
 	console.log('Somebody just came to our api!');
 	// Make sure we go to the next routes and don't stop here
-	next();
+
+	// Route middleware to verify a token
+	// Check header or irl parameters or post parameters for token
+	var token = req.body.token || req.param('token') || req.headers['x-access-token'];
+
+	// Decode token
+	if (token) {
+		// Verify secret and checks exp
+		jwt.verify(token, superSecret, function(err, decoded) {
+			if (err) {
+				return res.status(403).send({
+					success: false,
+					message: 'Failed to authenticate token.'
+				});
+			} else {
+				// If everything is good, save to request for use in other routes
+				req.decoded = decoded;
+				next();
+			}
+		});
+	} else {
+		// If thete is no token, return an HTTP response of 403 (access forbidden) and an error message
+		return res.status(403).send({
+			success: false,
+			message: 'No token provided.'
+		});
+	}
+	// next(); // Used to be here
 });
 
 // Test route to make sure everything is working
@@ -142,55 +169,61 @@ apiRouter.route('/users')
 		});
 	});
 
-	apiRouter.route('/users/:user_id')
-		// Get the user with that id (accessed at GET http://localhost:1337/api/users/:user_id)
-		.get(function(req, res) {
-			console.log(req);		
-			User.findOne({ "_id": ObjectId(req.params.user_id) }, function(err, user) {
+apiRouter.route('/users/:user_id')
+	// Get the user with that id (accessed at GET http://localhost:1337/api/users/:user_id)
+	.get(function(req, res) {
+		console.log(req);		
+		User.findOne({ "_id": ObjectId(req.params.user_id) }, function(err, user) {
+			if (err) {
+				res.send(err);
+			}
+			res.json(user);
+		});
+	})
+	// Update the user with this id (accessed at PUT http://localhost:1337/api/users/:user_id)
+	.put(function(req, res) {
+		// Use our user model to find the user we want
+		User.findOne({ "_id": ObjectId(req.params.user_id) }, function(err, user) {
+			if (err) {
+				res.send(err);
+			}
+			// Update the users info only if its new
+			if (req.body.name) {
+				user.name = req.body.name;
+			}
+			if (req.body.username) {
+				user.username = req.body.username;
+			}
+			if (req.body.password) {
+				user.password = req.body.password;
+			}
+
+			// Save the user
+			user.save(function(err) {
 				if (err) {
 					res.send(err);
-				}
-				res.json(user);
-			});
-		})
-		// Update the user with this id (accessed at PUT http://localhost:1337/api/users/:user_id)
-		.put(function(req, res) {
-			// Use our user model to find the user we want
-			User.findOne({ "_id": ObjectId(req.params.user_id) }, function(err, user) {
-				if (err) {
-					res.send(err);
-				}
-				// Update the users info only if its new
-				if (req.body.name) {
-					user.name = req.body.name;
-				}
-				if (req.body.username) {
-					user.username = req.body.username;
-				}
-				if (req.body.password) {
-					user.password = req.body.password;
 				}
 
-				// Save the user
-				user.save(function(err) {
-					if (err) {
-						res.send(err);
-					}
-
-					// Return a message
-					res.json({ message: 'User updated!!' });
-				});
-			});
-		})
-		// Delete the user with this id (accessed at DELETE http://localhost:1337/api/users/:user_id)
-		.delete(function(req, res) {
-			User.remove({ "_id": ObjectId(req.params.user_id) }, function(err, user) {
-				if (err) {
-					res.send(err);
-				}
-				res.json({ message: 'Successfully deleted!!' });
+				// Return a message
+				res.json({ message: 'User updated!!' });
 			});
 		});
+	})
+	// Delete the user with this id (accessed at DELETE http://localhost:1337/api/users/:user_id)
+	.delete(function(req, res) {
+		User.remove({ "_id": ObjectId(req.params.user_id) }, function(err, user) {
+			if (err) {
+				res.send(err);
+			}
+			res.json({ message: 'Successfully deleted!!' });
+		});
+	});
+
+// API endpoint to get user information
+apiRouter.get('/me', function(req, res) {
+	res.send(req.decoded);
+});
+
 
 // More routes for our API will happen here
 
