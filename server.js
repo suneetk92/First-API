@@ -17,6 +17,11 @@ var ObjectId    = mongoDB.ObjectID;
 var jwt         = require('jsonwebtoken');
 var superSecret = 'mynameissuneet';
 
+// Get the things we need
+var path        = require('path');
+var ap2         = express();
+var port2       = process.env.PORT2 || 1338;
+
 // *****************
 // APP CONFIGURATION
 // *****************
@@ -25,7 +30,7 @@ var superSecret = 'mynameissuneet';
 mongoose.connect('mongodb://localhost:27017/api')
 
 // Use body parser so we can grab information from POST requests
-app.use(bodyParser.urlencoded({extended: true}));
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
 // Configure our app to handle CORS requests
@@ -227,6 +232,14 @@ apiRouter.get('/me', function(req, res) {
 
 // More routes for our API will happen here
 
+//  Set the public folder to serve public assets
+ap2.use(express.static(__dirname + '/public'));
+
+// Set up our router to the index.html file
+ap2.get('*', function(req, res) {
+	res.sendFile(path.join(__dirname + '/public/views/index.html'));
+});
+
 // *******************
 // REGISTER OUR ROUTES
 // *******************
@@ -238,4 +251,6 @@ app.use('/api', apiRouter);
 // START THE SERVER
 // ================
 app.listen(port);
+ap2.listen(port2);
 console.log('Magic happens on the port ' + port);
+console.log('Magic happens on the port ' + port2);
